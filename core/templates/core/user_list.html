@@ -1,0 +1,91 @@
+{% extends 'core/base.html' %}
+{% block title %}Users - Zybo Chat{% endblock %}
+
+{% block body %}
+<div class="app-layout">
+    <!-- Sidebar -->
+    <div class="sidebar">
+        <div class="sidebar-top">
+            <div class="logo">
+                <div class="logo-icon">
+                    <i class="lucide-message-circle" style="font-size: 18px;"></i>
+                </div>
+                <span class="logo-text">Zybo Chat</span>
+            </div>
+
+            <nav class="sidebar-nav">
+                <a href="{% url 'user_list' %}" class="nav-item active">
+                    <i class="lucide-users"></i>
+                    All Users
+                </a>
+            </nav>
+        </div>
+
+        <div class="sidebar-bottom">
+            <div class="user-profile">
+                <div class="user-avatar avatar-color-4">
+                    {{ request.user.username|make_list|first|upper }}{{ request.user.username|make_list|last|upper }}
+                </div>
+                <div class="user-info">
+                    <div class="user-name">{{ request.user.username }}</div>
+                    <div class="user-status">Online</div>
+                </div>
+            </div>
+            <a href="{% url 'logout' %}" class="btn-logout">
+                <i class="lucide-log-out" style="font-size: 16px;"></i>
+                Logout
+            </a>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="main-content">
+        <div class="main-header">
+            <div class="main-header-left">
+                <h1 class="page-title">People</h1>
+                <p class="page-subtitle">Click on a user to start chatting</p>
+            </div>
+            <div class="main-search-bar">
+                <i class="lucide-search"></i>
+                <input type="text" placeholder="Search users..." id="searchInput" oninput="filterUsers()">
+            </div>
+        </div>
+
+        <div class="users-grid" id="usersGrid">
+            {% for user in users %}
+            <a href="{% url 'chat' user.id %}" class="user-card" data-username="{{ user.username|lower }}">
+                <div
+                    class="card-avatar avatar-color-{{ forloop.counter|add:'0'|divisibleby:7|yesno:'7,0' }}{% widthratio forloop.counter0 1 1 as idx %}avatar-color-{{ forloop.counter }}">
+                    {{ user.username|make_list|first|upper }}{{ user.username|make_list|last|upper }}
+                </div>
+                <div class="card-info">
+                    <div class="card-name">{{ user.username }}</div>
+                    <div class="card-email">{{ user.email }}</div>
+                </div>
+                <div class="status-badge {% if user.is_online %}online{% else %}offline{% endif %}">
+                    <span class="status-dot {% if user.is_online %}online{% else %}offline{% endif %}"></span>
+                    {% if user.is_online %}Online{% else %}Offline{% endif %}
+                </div>
+            </a>
+            {% empty %}
+            <p style="color: var(--text-muted); padding: 40px; text-align: center; grid-column: 1 / -1;">
+                No other users have registered yet. Share the link to invite friends!
+            </p>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function filterUsers() {
+        const query = document.getElementById('searchInput').value.toLowerCase();
+        const cards = document.querySelectorAll('.user-card');
+        cards.forEach(card => {
+            const username = card.dataset.username;
+            card.style.display = username.includes(query) ? '' : 'none';
+        });
+    }
+</script>
+{% endblock %}

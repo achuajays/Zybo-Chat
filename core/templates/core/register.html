@@ -1,0 +1,93 @@
+{% extends 'core/base.html' %}
+{% block title %}Register - Zybo Chat{% endblock %}
+
+{% block body %}
+<div class="auth-page">
+    <!-- Left Panel: Form -->
+    <div class="auth-left">
+        <div class="logo">
+            <div class="logo-icon">
+                <i class="lucide-message-circle" style="font-size: 18px;"></i>
+            </div>
+            <span class="logo-text">Zybo Chat</span>
+        </div>
+
+        <h1 class="auth-title">Create Account</h1>
+        <p class="auth-subtitle">Join Zybo Chat and start messaging</p>
+
+        {% if form.errors %}
+        <div class="error-messages">
+            {% for field in form %}
+            {% for error in field.errors %}
+            <p>{{ error }}</p>
+            {% endfor %}
+            {% endfor %}
+            {% for error in form.non_field_errors %}
+            <p>{{ error }}</p>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <form method="post" novalidate>
+            {% csrf_token %}
+
+            <div class="form-group">
+                <label class="form-label">Email Address</label>
+                <div class="input-wrapper">
+                    <i class="lucide-mail input-icon"></i>
+                    {{ form.email }}
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Username</label>
+                <div class="input-wrapper">
+                    <i class="lucide-user input-icon"></i>
+                    {{ form.username }}
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Password</label>
+                <div class="input-wrapper">
+                    <i class="lucide-lock input-icon"></i>
+                    {{ form.password1 }}
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Confirm Password</label>
+                <div class="input-wrapper">
+                    <i class="lucide-lock input-icon"></i>
+                    {{ form.password2 }}
+                </div>
+            </div>
+
+            <button type="submit" class="btn-primary">
+                <i class="lucide-user-plus" style="font-size: 16px;"></i>
+                Create Account
+            </button>
+        </form>
+
+        <p class="auth-switch">
+            Already have an account? <a href="{% url 'login' %}">Sign In</a>
+        </p>
+    </div>
+
+    <!-- Right Panel: Illustration -->
+    <div class="auth-right">
+        <div class="auth-illustration">
+            <div class="illustration-circles">
+                <div class="illustration-inner">
+                    <i class="lucide-message-circle illustration-icon"></i>
+                </div>
+            </div>
+            <h2 class="illustration-title">Connect Instantly</h2>
+            <p class="illustration-desc">
+                Real-time messaging with friends and colleagues.
+                Fast, secure, and beautifully designed.
+            </p>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,218 @@
+{% extends 'core/base.html' %}
+{% block title %}Chat with {{ other_user.username }} - Zybo Chat{% endblock %}
+
+{% block body %}
+<div class="app-layout">
+    <!-- Sidebar -->
+    <div class="sidebar">
+        <div class="sidebar-top">
+            <div class="logo">
+                <div class="logo-icon">
+                    <i class="lucide-message-circle" style="font-size: 18px;"></i>
+                </div>
+                <span class="logo-text">Zybo Chat</span>
+            </div>
+
+            <div class="search-bar">
+                <i class="lucide-search"></i>
+                <input type="text" placeholder="Search chats..." id="chatSearchInput" oninput="filterChats()">
+            </div>
+
+            <div class="chat-list" id="chatList">
+                {% for chat in recent_chats %}
+                <a href="{% url 'chat' chat.user.id %}"
+                    class="chat-item {% if chat.user.id == other_user.id %}active{% endif %}"
+                    data-username="{{ chat.user.username|lower }}">
+                    <div class="chat-item-avatar avatar-color-{{ forloop.counter }}">
+                        {{ chat.user.username|make_list|first|upper }}{{ chat.user.username|make_list|last|upper }}
+                    </div>
+                    <div class="chat-item-info">
+                        <div class="chat-item-name">{{ chat.user.username }}</div>
+                        <div class="chat-item-preview">{{ chat.last_message.content|truncatewords:6 }}</div>
+                    </div>
+                    {% if chat.user.is_online %}
+                    <span class="chat-item-dot"></span>
+                    {% endif %}
+                </a>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="sidebar-bottom">
+            <div class="user-profile">
+                <div class="user-avatar avatar-color-4">
+                    {{ request.user.username|make_list|first|upper }}{{ request.user.username|make_list|last|upper }}
+                </div>
+                <div class="user-info">
+                    <div class="user-name">{{ request.user.username }}</div>
+                    <div class="user-status">Online</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Chat Area -->
+    <div class="chat-area">
+        <!-- Chat Header -->
+        <div class="chat-header">
+            <div class="chat-header-left">
+                <a href="{% url 'user_list' %}" style="display:flex; align-items:center; margin-right: 4px;">
+                    <i class="lucide-arrow-left" style="font-size: 18px; color: var(--text-muted);"></i>
+                </a>
+                <div class="chat-header-avatar avatar-color-1">
+                    {{ other_user.username|make_list|first|upper }}{{ other_user.username|make_list|last|upper }}
+                </div>
+                <div>
+                    <div class="chat-header-name">{{ other_user.username }}</div>
+                    <div class="chat-header-status {% if other_user.is_online %}online{% else %}offline{% endif %}"
+                        id="userStatus">
+                        {% if other_user.is_online %}Online{% else %}Last seen {{ other_user.last_seen|timesince }}
+                        ago{% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Messages Area -->
+        <div class="messages-area" id="messagesArea">
+            {% for msg in messages %}
+            <div class="message {% if msg.sender == request.user %}sent{% else %}received{% endif %}"
+                data-id="{{ msg.id }}">
+                <div class="message-bubble">{{ msg.content }}</div>
+                <div class="message-meta">
+                    <span class="message-time">{{ msg.timestamp|date:"h:i A" }}</span>
+                    {% if msg.sender == request.user %}
+                    <span class="message-read {% if msg.is_read %}read{% else %}sent{% endif %}">
+                        {% if msg.is_read %}✓✓{% else %}✓{% endif %}
+                    </span>
+                    {% endif %}
+                </div>
+            </div>
+            {% empty %}
+            <div style="text-align: center; color: var(--text-muted); padding: 40px;">
+                <i class="lucide-message-circle"
+                    style="font-size: 48px; margin-bottom: 12px; display: block; opacity: 0.3;"></i>
+                <p>No messages yet. Say hi to {{ other_user.username }}!</p>
+            </div>
+            {% endfor %}
+        </div>
+
+        <!-- Input Bar -->
+        <div class="input-bar">
+            <div class="input-field">
+                <input type="text" placeholder="Type a message..." id="messageInput" autocomplete="off">
+            </div>
+            <button class="btn-send" id="sendBtn" onclick="sendMessage()">
+                <i class="lucide-send"></i>
+            </button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const currentUserId = {{ request.user.id }};
+    const otherUserId = {{ other_user.id }};
+    const messagesArea = document.getElementById('messagesArea');
+    const messageInput = document.getElementById('messageInput');
+
+    // Scroll to bottom on load
+    messagesArea.scrollTop = messagesArea.scrollHeight;
+
+    // WebSocket connection
+    const wsProtocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
+    const chatSocket = new WebSocket(
+        wsProtocol + window.location.host + '/ws/chat/' + otherUserId + '/'
+    );
+
+    chatSocket.onmessage = function (e) {
+        const data = JSON.parse(e.data);
+
+        if (data.type === 'chat_message') {
+            appendMessage(data);
+
+            // Mark messages as read if from the other user
+            if (data.sender_id !== currentUserId) {
+                chatSocket.send(JSON.stringify({ type: 'mark_read' }));
+            }
+        } else if (data.type === 'messages_read') {
+            // Update read receipts for sent messages
+            if (data.reader_id !== currentUserId) {
+                document.querySelectorAll('.message.sent .message-read.sent').forEach(el => {
+                    el.textContent = '✓✓';
+                    el.classList.remove('sent');
+                    el.classList.add('read');
+                });
+            }
+        }
+    };
+
+    chatSocket.onclose = function (e) {
+        console.log('Chat socket closed.');
+    };
+
+    chatSocket.onerror = function (e) {
+        console.error('WebSocket error:', e);
+    };
+
+    function sendMessage() {
+        const message = messageInput.value.trim();
+        if (message === '') return;
+
+        chatSocket.send(JSON.stringify({
+            type: 'chat_message',
+            message: message,
+        }));
+
+        messageInput.value = '';
+        messageInput.focus();
+    }
+
+    function appendMessage(data) {
+        const isSent = data.sender_id === currentUserId;
+        const div = document.createElement('div');
+        div.className = 'message ' + (isSent ? 'sent' : 'received');
+        div.dataset.id = data.message_id;
+
+        let metaHtml = `<span class="message-time">${data.timestamp}</span>`;
+        if (isSent) {
+            metaHtml += `<span class="message-read sent">✓</span>`;
+        }
+
+        div.innerHTML = `
+            <div class="message-bubble">${escapeHtml(data.message)}</div>
+            <div class="message-meta">${metaHtml}</div>
+        `;
+
+        messagesArea.appendChild(div);
+        messagesArea.scrollTop = messagesArea.scrollHeight;
+    }
+
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    // Send on Enter key
+    messageInput.addEventListener('keyup', function (e) {
+        if (e.key === 'Enter') {
+            sendMessage();
+        }
+    });
+
+    // Mark messages as read on page load
+    chatSocket.addEventListener('open', function () {
+        chatSocket.send(JSON.stringify({ type: 'mark_read' }));
+    });
+
+    function filterChats() {
+        const query = document.getElementById('chatSearchInput').value.toLowerCase();
+        document.querySelectorAll('.chat-item').forEach(item => {
+            const username = item.dataset.username;
+            item.style.display = username.includes(query) ? '' : 'none';
+        });
+    }
+</script>
+{% endblock %}
