@@ -173,8 +173,8 @@ sequenceDiagram
 ### 1. Clone the repository
 
 ```bash
-git clone https://github.com/your-username/zybo.git
-cd zybo
+git clone https://github.com/achuajays/Zybo-Chat.git
+cd Zybo-Chat
 ```
 
 ### 2. Install dependencies
