@@ -19,8 +19,8 @@ db.sqlite3
 media/
 staticfiles/
 
-# uv
-uv.lock
+# uv - keep uv.lock so Docker can install pinned deps
+# uv.lock  <-- intentionally NOT ignored
 
 # Git
 .git/
