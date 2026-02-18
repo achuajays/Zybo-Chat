@@ -1,4 +1,5 @@
 {% extends 'core/base.html' %}
+{% load chat_tags %}
 {% block title %}Users - Zybo Chat{% endblock %}
 
 {% block body %}
@@ -23,8 +24,8 @@
 
         <div class="sidebar-bottom">
             <div class="user-profile">
-                <div class="user-avatar avatar-color-4">
-                    {{ request.user.username|make_list|first|upper }}{{ request.user.username|make_list|last|upper }}
+                <div class="user-avatar" style="background: #C9B8A8;">
+                    {{ request.user.username|initials }}
                 </div>
                 <div class="user-info">
                     <div class="user-name">{{ request.user.username }}</div>
@@ -54,9 +55,8 @@
         <div class="users-grid" id="usersGrid">
             {% for user in users %}
             <a href="{% url 'chat' user.id %}" class="user-card" data-username="{{ user.username|lower }}">
-                <div
-                    class="card-avatar avatar-color-{{ forloop.counter|add:'0'|divisibleby:7|yesno:'7,0' }}{% widthratio forloop.counter0 1 1 as idx %}avatar-color-{{ forloop.counter }}">
-                    {{ user.username|make_list|first|upper }}{{ user.username|make_list|last|upper }}
+                <div class="card-avatar" style="background: {{ forloop.counter0|avatar_color }};">
+                    {{ user.username|initials }}
                 </div>
                 <div class="card-info">
                     <div class="card-name">{{ user.username }}</div>

@@ -1,4 +1,5 @@
 {% extends 'core/base.html' %}
+{% load chat_tags %}
 {% block title %}Chat with {{ other_user.username }} - Zybo Chat{% endblock %}
 
 {% block body %}
@@ -23,8 +24,8 @@
                 <a href="{% url 'chat' chat.user.id %}"
                     class="chat-item {% if chat.user.id == other_user.id %}active{% endif %}"
                     data-username="{{ chat.user.username|lower }}">
-                    <div class="chat-item-avatar avatar-color-{{ forloop.counter }}">
-                        {{ chat.user.username|make_list|first|upper }}{{ chat.user.username|make_list|last|upper }}
+                    <div class="chat-item-avatar" style="background: {{ forloop.counter0|avatar_color }};">
+                        {{ chat.user.username|initials }}
                     </div>
                     <div class="chat-item-info">
                         <div class="chat-item-name">{{ chat.user.username }}</div>
@@ -40,8 +41,8 @@
 
         <div class="sidebar-bottom">
             <div class="user-profile">
-                <div class="user-avatar avatar-color-4">
-                    {{ request.user.username|make_list|first|upper }}{{ request.user.username|make_list|last|upper }}
+                <div class="user-avatar" style="background: #C9B8A8;">
+                    {{ request.user.username|initials }}
                 </div>
                 <div class="user-info">
                     <div class="user-name">{{ request.user.username }}</div>
@@ -59,8 +60,8 @@
                 <a href="{% url 'user_list' %}" style="display:flex; align-items:center; margin-right: 4px;">
                     <i class="lucide-arrow-left" style="font-size: 18px; color: var(--text-muted);"></i>
                 </a>
-                <div class="chat-header-avatar avatar-color-1">
-                    {{ other_user.username|make_list|first|upper }}{{ other_user.username|make_list|last|upper }}
+                <div class="chat-header-avatar" style="background: #7C9070;">
+                    {{ other_user.username|initials }}
                 </div>
                 <div>
                     <div class="chat-header-name">{{ other_user.username }}</div>
@@ -131,13 +132,10 @@
 
         if (data.type === 'chat_message') {
             appendMessage(data);
-
-            // Mark messages as read if from the other user
             if (data.sender_id !== currentUserId) {
                 chatSocket.send(JSON.stringify({ type: 'mark_read' }));
             }
         } else if (data.type === 'messages_read') {
-            // Update read receipts for sent messages
             if (data.reader_id !== currentUserId) {
                 document.querySelectorAll('.message.sent .message-read.sent').forEach(el => {
                     el.textContent = '✓✓';
@@ -148,28 +146,22 @@
         }
     };
 
-    chatSocket.onclose = function (e) {
-        console.log('Chat socket closed.');
-    };
-
-    chatSocket.onerror = function (e) {
-        console.error('WebSocket error:', e);
-    };
+    chatSocket.onclose = function (e) { console.log('Chat socket closed.'); };
+    chatSocket.onerror = function (e) { console.error('WebSocket error:', e); };
 
     function sendMessage() {
         const message = messageInput.value.trim();
         if (message === '') return;
-
-        chatSocket.send(JSON.stringify({
-            type: 'chat_message',
-            message: message,
-        }));
-
+        chatSocket.send(JSON.stringify({ type: 'chat_message', message: message }));
         messageInput.value = '';
         messageInput.focus();
     }
 
     function appendMessage(data) {
+        // Remove empty state if present
+        const emptyState = messagesArea.querySelector('div[style*="text-align: center"]');
+        if (emptyState) emptyState.remove();
+
         const isSent = data.sender_id === currentUserId;
         const div = document.createElement('div');
         div.className = 'message ' + (isSent ? 'sent' : 'received');
@@ -195,14 +187,10 @@
         return div.innerHTML;
     }
 
-    // Send on Enter key
     messageInput.addEventListener('keyup', function (e) {
-        if (e.key === 'Enter') {
-            sendMessage();
-        }
+        if (e.key === 'Enter') sendMessage();
     });
 
-    // Mark messages as read on page load
     chatSocket.addEventListener('open', function () {
         chatSocket.send(JSON.stringify({ type: 'mark_read' }));
     });
@@ -210,8 +198,7 @@
     function filterChats() {
         const query = document.getElementById('chatSearchInput').value.toLowerCase();
         document.querySelectorAll('.chat-item').forEach(item => {
-            const username = item.dataset.username;
-            item.style.display = username.includes(query) ? '' : 'none';
+            item.style.display = item.dataset.username.includes(query) ? '' : 'none';
         });
     }
 </script>
