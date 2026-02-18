@@ -62,9 +62,19 @@ def logout_view(request):
 
 @login_required
 def user_list_view(request):
-    """Display all users except the current user."""
-    users = User.objects.exclude(id=request.user.id)
-    return render(request, 'core/user_list.html', {'users': users})
+    """Display all users except the current user, with unread counts."""
+    from django.db.models import Count
+    users_qs = User.objects.exclude(id=request.user.id)
+
+    # Annotate each user with unread message count from them
+    users_with_unread = []
+    for user in users_qs:
+        unread = Message.objects.filter(
+            sender=user, receiver=request.user, is_read=False
+        ).count()
+        users_with_unread.append({'user': user, 'unread_count': unread})
+
+    return render(request, 'core/user_list.html', {'users': users_with_unread})
 
 
 @login_required

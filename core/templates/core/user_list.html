@@ -2,6 +2,25 @@
 {% load chat_tags %}
 {% block title %}Users - Zybo Chat{% endblock %}
 
+{% block extra_css %}
+<style>
+    .unread-badge {
+        min-width: 20px;
+        height: 20px;
+        padding: 0 6px;
+        border-radius: 10px;
+        background: var(--primary);
+        color: white;
+        font-size: 10px;
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-top: 4px;
+    }
+</style>
+{% endblock %}
+
 {% block body %}
 <div class="app-layout">
     <!-- Sidebar -->
@@ -9,14 +28,23 @@
         <div class="sidebar-top">
             <div class="logo">
                 <div class="logo-icon">
-                    <i class="lucide-message-circle" style="font-size: 18px;"></i>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                    </svg>
                 </div>
                 <span class="logo-text">Zybo Chat</span>
             </div>
 
             <nav class="sidebar-nav">
                 <a href="{% url 'user_list' %}" class="nav-item active">
-                    <i class="lucide-users"></i>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                        <circle cx="9" cy="7" r="4" />
+                        <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                        <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                    </svg>
                     All Users
                 </a>
             </nav>
@@ -33,7 +61,12 @@
                 </div>
             </div>
             <a href="{% url 'logout' %}" class="btn-logout">
-                <i class="lucide-log-out" style="font-size: 16px;"></i>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                    <polyline points="16 17 21 12 16 7" />
+                    <line x1="21" y1="12" x2="9" y2="12" />
+                </svg>
                 Logout
             </a>
         </div>
@@ -47,30 +80,39 @@
                 <p class="page-subtitle">Click on a user to start chatting</p>
             </div>
             <div class="main-search-bar">
-                <i class="lucide-search"></i>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="11" cy="11" r="8" />
+                    <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                </svg>
                 <input type="text" placeholder="Search users..." id="searchInput" oninput="filterUsers()">
             </div>
         </div>
 
         <div class="users-grid" id="usersGrid">
-            {% for user in users %}
-            <a href="{% url 'chat' user.id %}" class="user-card" data-username="{{ user.username|lower }}"
-                data-userid="{{ user.id }}">
+            {% for item in users %}
+            <a href="{% url 'chat' item.user.id %}" class="user-card" data-username="{{ item.user.username|lower }}"
+                data-userid="{{ item.user.id }}">
                 <div class="card-avatar" style="background: {{ forloop.counter0|avatar_color }};">
-                    {{ user.username|initials }}
+                    {{ item.user.username|initials }}
                 </div>
                 <div class="card-info">
-                    <div class="card-name">{{ user.username }}</div>
-                    <div class="card-email">{{ user.email }}</div>
+                    <div class="card-name">{{ item.user.username }}</div>
+                    <div class="card-email">{{ item.user.email }}</div>
                 </div>
-                <div class="status-badge {% if user.is_online %}online{% else %}offline{% endif %}">
-                    <span class="status-dot {% if user.is_online %}online{% else %}offline{% endif %}"></span>
-                    {% if user.is_online %}Online{% else %}Offline{% endif %}
+                <div style="display: flex; flex-direction: column; align-items: center; gap: 4px;">
+                    <div class="status-badge {% if item.user.is_online %}online{% else %}offline{% endif %}">
+                        <span class="status-dot {% if item.user.is_online %}online{% else %}offline{% endif %}"></span>
+                        {% if item.user.is_online %}Online{% else %}Offline{% endif %}
+                    </div>
+                    {% if item.unread_count > 0 %}
+                    <span class="unread-badge">{{ item.unread_count }} new</span>
+                    {% endif %}
                 </div>
             </a>
             {% empty %}
             <p style="color: var(--text-muted); padding: 40px; text-align: center; grid-column: 1 / -1;">
-                No other users have registered yet. Share the link to invite friends!
+                No other users have registered yet.
             </p>
             {% endfor %}
         </div>
@@ -80,13 +122,10 @@
 
 {% block scripts %}
 <script>
-    // Filter users
     function filterUsers() {
         const query = document.getElementById('searchInput').value.toLowerCase();
-        const cards = document.querySelectorAll('.user-card');
-        cards.forEach(card => {
-            const username = card.dataset.username;
-            card.style.display = username.includes(query) ? '' : 'none';
+        document.querySelectorAll('.user-card').forEach(card => {
+            card.style.display = card.dataset.username.includes(query) ? '' : 'none';
         });
     }
 
@@ -97,27 +136,20 @@
     });
 
     function updateUserStatus(userId, isOnline) {
-        // Find user card
         const userCard = document.querySelector(`.user-card[data-userid="${userId}"]`);
-        if (userCard) {
-            const badge = userCard.querySelector('.status-badge');
-            const dot = badge.querySelector('.status-dot');
+        if (!userCard) return;
+        const badge = userCard.querySelector('.status-badge');
+        const dot = userCard.querySelector('.status-dot');
+        if (!badge || !dot) return;
 
-            if (isOnline) {
-                userCard.querySelector('.status-badge').className = 'status-badge online';
-                userCard.querySelector('.status-dot').className = 'status-dot online';
-                // Update text node specifically
-                Array.from(badge.childNodes).forEach(node => {
-                    if (node.nodeType === Node.TEXT_NODE) node.textContent = ' Online';
-                });
-            } else {
-                userCard.querySelector('.status-badge').className = 'status-badge offline';
-                userCard.querySelector('.status-dot').className = 'status-dot offline';
-                Array.from(badge.childNodes).forEach(node => {
-                    if (node.nodeType === Node.TEXT_NODE) node.textContent = ' Offline';
-                });
+        badge.className = 'status-badge ' + (isOnline ? 'online' : 'offline');
+        dot.className = 'status-dot ' + (isOnline ? 'online' : 'offline');
+        // Update text (last text node in badge)
+        Array.from(badge.childNodes).forEach(node => {
+            if (node.nodeType === Node.TEXT_NODE) {
+                node.textContent = isOnline ? ' Online' : ' Offline';
             }
-        }
+        });
     }
 </script>
 {% endblock %}

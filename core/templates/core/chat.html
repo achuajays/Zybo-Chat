@@ -2,6 +2,128 @@
 {% load chat_tags %}
 {% block title %}Chat with {{ other_user.username }} - Zybo Chat{% endblock %}
 
+{% block extra_css %}
+<style>
+    /* ── Typing Indicator ───────────────────────── */
+    .typing-indicator {
+        display: none;
+        align-items: center;
+        gap: 8px;
+        padding: 0 0 8px 0;
+        align-self: flex-start;
+    }
+
+    .typing-indicator.visible {
+        display: flex;
+    }
+
+    .typing-dots {
+        display: flex;
+        gap: 4px;
+        background: var(--bg-white);
+        padding: 10px 14px;
+        border-radius: 16px 16px 16px 4px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.04);
+    }
+
+    .typing-dots span {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: var(--text-muted);
+        animation: bounce 1.2s infinite;
+    }
+
+    .typing-dots span:nth-child(2) {
+        animation-delay: 0.2s;
+    }
+
+    .typing-dots span:nth-child(3) {
+        animation-delay: 0.4s;
+    }
+
+    @keyframes bounce {
+
+        0%,
+        60%,
+        100% {
+            transform: translateY(0);
+        }
+
+        30% {
+            transform: translateY(-6px);
+        }
+    }
+
+    .typing-label {
+        font-size: 11px;
+        color: var(--text-muted);
+    }
+
+    /* ── Unread Badge ───────────────────────────── */
+    .unread-badge {
+        min-width: 18px;
+        height: 18px;
+        padding: 0 5px;
+        border-radius: 9px;
+        background: var(--primary);
+        color: white;
+        font-size: 10px;
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+    }
+
+    /* ── Delete Button ──────────────────────────── */
+    .message {
+        position: relative;
+    }
+
+    .message:hover .delete-btn {
+        opacity: 1;
+    }
+
+    .delete-btn {
+        opacity: 0;
+        position: absolute;
+        top: 0;
+        background: none;
+        border: none;
+        cursor: pointer;
+        padding: 4px;
+        border-radius: 6px;
+        transition: opacity 0.15s, background 0.15s;
+        color: var(--text-muted);
+        line-height: 1;
+    }
+
+    .message.sent .delete-btn {
+        left: -28px;
+    }
+
+    .message.received .delete-btn {
+        right: -28px;
+        display: none;
+    }
+
+    .delete-btn:hover {
+        background: #FFF0F0;
+        color: #C53030;
+    }
+
+    .message-deleted-placeholder {
+        font-size: 12px;
+        color: var(--text-muted);
+        font-style: italic;
+        padding: 8px 14px;
+        background: var(--bg-parchment);
+        border-radius: 10px;
+    }
+</style>
+{% endblock %}
+
 {% block body %}
 <div class="app-layout">
     <!-- Sidebar -->
@@ -9,13 +131,20 @@
         <div class="sidebar-top">
             <div class="logo">
                 <div class="logo-icon">
-                    <i class="lucide-message-circle" style="font-size: 18px;"></i>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                    </svg>
                 </div>
                 <span class="logo-text">Zybo Chat</span>
             </div>
 
             <div class="search-bar">
-                <i class="lucide-search"></i>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="11" cy="11" r="8" />
+                    <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                </svg>
                 <input type="text" placeholder="Search chats..." id="chatSearchInput" oninput="filterChats()">
             </div>
 
@@ -29,9 +158,11 @@
                     </div>
                     <div class="chat-item-info">
                         <div class="chat-item-name">{{ chat.user.username }}</div>
-                        <div class="chat-item-preview">{{ chat.last_message.content|truncatewords:6 }}</div>
+                        <div class="chat-item-preview">{{ chat.last_message.content|truncatewords:5 }}</div>
                     </div>
-                    {% if chat.user.is_online %}
+                    {% if chat.unread_count > 0 and chat.user.id != other_user.id %}
+                    <span class="unread-badge">{{ chat.unread_count }}</span>
+                    {% elif chat.user.is_online %}
                     <span class="chat-item-dot"></span>
                     {% endif %}
                 </a>
@@ -59,7 +190,11 @@
             <div class="chat-header-left">
                 <a href="{% url 'user_list' %}"
                     style="display:flex; align-items:center; margin-right: 12px; text-decoration: none; color: var(--text-secondary);">
-                    <i class="lucide-arrow-left" style="font-size: 20px;"></i>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="19" y1="12" x2="5" y2="12" />
+                        <polyline points="12 19 5 12 12 5" />
+                    </svg>
                     <span style="margin-left: 4px; font-weight: 500; font-size: 14px;">Back</span>
                 </a>
                 <div class="chat-header-avatar" style="background: #7C9070;">
@@ -81,6 +216,18 @@
             {% for msg in messages %}
             <div class="message {% if msg.sender == request.user %}sent{% else %}received{% endif %}"
                 data-id="{{ msg.id }}">
+                {% if msg.sender == request.user %}
+                <button class="delete-btn" onclick="deleteMessage({{ msg.id }})" title="Delete message">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="3 6 5 6 21 6" />
+                        <path d="M19 6l-1 14H6L5 6" />
+                        <path d="M10 11v6" />
+                        <path d="M14 11v6" />
+                        <path d="M9 6V4h6v2" />
+                    </svg>
+                </button>
+                {% endif %}
                 <div class="message-bubble">{{ msg.content }}</div>
                 <div class="message-meta">
                     <span class="message-time">{{ msg.timestamp|date:"h:i A" }}</span>
@@ -92,22 +239,33 @@
                 </div>
             </div>
             {% empty %}
-            <div style="text-align: center; color: var(--text-muted); padding: 40px;">
-                <i class="lucide-message-circle"
-                    style="font-size: 48px; margin-bottom: 12px; display: block; opacity: 0.3;"></i>
+            <div id="emptyState" style="text-align: center; color: var(--text-muted); padding: 40px;">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"
+                    stroke-linecap="round" stroke-linejoin="round"
+                    style="margin: 0 auto 12px; display: block; opacity: 0.3;">
+                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                </svg>
                 <p>No messages yet. Say hi to {{ other_user.username }}!</p>
             </div>
             {% endfor %}
+
+            <!-- Typing Indicator -->
+            <div class="typing-indicator" id="typingIndicator">
+                <div class="typing-dots">
+                    <span></span><span></span><span></span>
+                </div>
+                <span class="typing-label">{{ other_user.username }} is typing…</span>
+            </div>
         </div>
 
         <!-- Input Bar -->
         <div class="input-bar">
             <div class="input-field">
-                <input type="text" placeholder="Type a message..." id="messageInput" autocomplete="off">
+                <input type="text" placeholder="Type a message…" id="messageInput" autocomplete="off">
             </div>
             <button class="btn-send" id="sendBtn" onclick="sendMessage()">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                    stroke-linecap="round" stroke-linejoin="round" class="lucide-send">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                    stroke-linecap="round" stroke-linejoin="round">
                     <line x1="22" y1="2" x2="11" y2="13" />
                     <polygon points="22 2 15 22 11 13 2 9 22 2" />
                 </svg>
@@ -123,34 +281,16 @@
     const otherUserId = {{ other_user.id }};
     const messagesArea = document.getElementById('messagesArea');
     const messageInput = document.getElementById('messageInput');
+    const typingIndicator = document.getElementById('typingIndicator');
 
     // Scroll to bottom on load
     messagesArea.scrollTop = messagesArea.scrollHeight;
 
-    // WebSocket connection
+    // ── WebSocket ──────────────────────────────────────────────────────
     const wsProtocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
     const chatSocket = new WebSocket(
         wsProtocol + window.location.host + '/ws/chat/' + otherUserId + '/'
     );
-
-    // Listen for global status updates
-    window.addEventListener('user_status_change', function (e) {
-        const { userId, isOnline } = e.detail;
-        if (userId === otherUserId) {
-            updateChatHeaderStatus(isOnline);
-        }
-    });
-
-    function updateChatHeaderStatus(isOnline) {
-        const statusDiv = document.getElementById('userStatus');
-        if (isOnline) {
-            statusDiv.className = 'chat-header-status online';
-            statusDiv.textContent = 'Online';
-        } else {
-            statusDiv.className = 'chat-header-status offline';
-            statusDiv.textContent = 'Offline';
-        }
-    }
 
     chatSocket.onmessage = function (e) {
         const data = JSON.parse(e.data);
@@ -164,27 +304,85 @@
             if (data.reader_id !== currentUserId) {
                 document.querySelectorAll('.message.sent .message-read.sent').forEach(el => {
                     el.textContent = '✓✓';
-                    el.classList.remove('sent');
-                    el.classList.add('read');
+                    el.classList.replace('sent', 'read');
                 });
             }
+        } else if (data.type === 'typing_indicator') {
+            if (data.sender_id !== currentUserId) {
+                showTyping(data.is_typing);
+            }
+        } else if (data.type === 'message_deleted') {
+            handleMessageDeleted(data.message_id);
         }
     };
 
     chatSocket.onclose = function (e) { console.log('Chat socket closed.'); };
     chatSocket.onerror = function (e) { console.error('WebSocket error:', e); };
 
+    chatSocket.addEventListener('open', function () {
+        chatSocket.send(JSON.stringify({ type: 'mark_read' }));
+    });
+
+    // ── Send Message ───────────────────────────────────────────────────
     function sendMessage() {
         const message = messageInput.value.trim();
-        if (message === '') return;
-        chatSocket.send(JSON.stringify({ type: 'chat_message', message: message }));
+        if (!message) return;
+        chatSocket.send(JSON.stringify({ type: 'chat_message', message }));
         messageInput.value = '';
         messageInput.focus();
+        // Stop typing indicator immediately
+        sendTyping(false);
     }
 
+    // ── Typing Indicator ───────────────────────────────────────────────
+    let typingTimeout = null;
+    let isCurrentlyTyping = false;
+
+    function sendTyping(isTyping) {
+        if (isTyping === isCurrentlyTyping) return;
+        isCurrentlyTyping = isTyping;
+        chatSocket.send(JSON.stringify({ type: 'typing', is_typing: isTyping }));
+    }
+
+    function showTyping(isTyping) {
+        typingIndicator.classList.toggle('visible', isTyping);
+        if (isTyping) messagesArea.scrollTop = messagesArea.scrollHeight;
+    }
+
+    messageInput.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') {
+            sendMessage();
+            return;
+        }
+        sendTyping(true);
+        clearTimeout(typingTimeout);
+        typingTimeout = setTimeout(() => sendTyping(false), 2000);
+    });
+
+    // ── Delete Message ─────────────────────────────────────────────────
+    function deleteMessage(messageId) {
+        if (!confirm('Delete this message?')) return;
+        chatSocket.send(JSON.stringify({ type: 'delete_message', message_id: messageId }));
+    }
+
+    function handleMessageDeleted(messageId) {
+        const msgEl = document.querySelector(`.message[data-id="${messageId}"]`);
+        if (msgEl) {
+            const bubble = msgEl.querySelector('.message-bubble');
+            if (bubble) {
+                bubble.innerHTML = '<span class="message-deleted-placeholder">🗑 Message deleted</span>';
+                bubble.style.background = 'transparent';
+                bubble.style.padding = '0';
+                bubble.style.boxShadow = 'none';
+            }
+            const deleteBtn = msgEl.querySelector('.delete-btn');
+            if (deleteBtn) deleteBtn.remove();
+        }
+    }
+
+    // ── Append New Message ─────────────────────────────────────────────
     function appendMessage(data) {
-        // Remove empty state if present
-        const emptyState = messagesArea.querySelector('div[style*="text-align: center"]');
+        const emptyState = document.getElementById('emptyState');
         if (emptyState) emptyState.remove();
 
         const isSent = data.sender_id === currentUserId;
@@ -192,34 +390,46 @@
         div.className = 'message ' + (isSent ? 'sent' : 'received');
         div.dataset.id = data.message_id;
 
-        let metaHtml = `<span class="message-time">${data.timestamp}</span>`;
+        let deleteHtml = '';
         if (isSent) {
-            metaHtml += `<span class="message-read sent">✓</span>`;
+            deleteHtml = `<button class="delete-btn" onclick="deleteMessage(${data.message_id})" title="Delete message">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>
+            </button>`;
         }
 
+        let metaHtml = `<span class="message-time">${data.timestamp}</span>`;
+        if (isSent) metaHtml += `<span class="message-read sent">✓</span>`;
+
         div.innerHTML = `
+            ${deleteHtml}
             <div class="message-bubble">${escapeHtml(data.message)}</div>
             <div class="message-meta">${metaHtml}</div>
         `;
 
-        messagesArea.appendChild(div);
+        // Insert before typing indicator
+        messagesArea.insertBefore(div, typingIndicator);
         messagesArea.scrollTop = messagesArea.scrollHeight;
     }
 
     function escapeHtml(text) {
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
+        const d = document.createElement('div');
+        d.textContent = text;
+        return d.innerHTML;
     }
 
-    messageInput.addEventListener('keyup', function (e) {
-        if (e.key === 'Enter') sendMessage();
+    // ── Online Status ──────────────────────────────────────────────────
+    window.addEventListener('user_status_change', function (e) {
+        const { userId, isOnline } = e.detail;
+        if (userId === otherUserId) updateChatHeaderStatus(isOnline);
     });
 
-    chatSocket.addEventListener('open', function () {
-        chatSocket.send(JSON.stringify({ type: 'mark_read' }));
-    });
+    function updateChatHeaderStatus(isOnline) {
+        const statusDiv = document.getElementById('userStatus');
+        statusDiv.className = 'chat-header-status ' + (isOnline ? 'online' : 'offline');
+        statusDiv.textContent = isOnline ? 'Online' : 'Offline';
+    }
 
+    // ── Sidebar Search ─────────────────────────────────────────────────
     function filterChats() {
         const query = document.getElementById('chatSearchInput').value.toLowerCase();
         document.querySelectorAll('.chat-item').forEach(item => {
