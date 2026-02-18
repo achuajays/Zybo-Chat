@@ -34,6 +34,9 @@ ENV PATH="/app/.venv/bin:$PATH" \
 # Copy project source
 COPY --chown=django:django . .
 
+# Create a writable directory for SQLite database, owned by django user
+RUN mkdir -p /data && chown django:django /data
+
 # Collect static files
 RUN SECRET_KEY=build-time-placeholder \
     DEBUG=False \
