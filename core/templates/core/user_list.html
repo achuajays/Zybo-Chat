@@ -54,7 +54,8 @@
 
         <div class="users-grid" id="usersGrid">
             {% for user in users %}
-            <a href="{% url 'chat' user.id %}" class="user-card" data-username="{{ user.username|lower }}">
+            <a href="{% url 'chat' user.id %}" class="user-card" data-username="{{ user.username|lower }}"
+                data-userid="{{ user.id }}">
                 <div class="card-avatar" style="background: {{ forloop.counter0|avatar_color }};">
                     {{ user.username|initials }}
                 </div>
@@ -79,6 +80,7 @@
 
 {% block scripts %}
 <script>
+    // Filter users
     function filterUsers() {
         const query = document.getElementById('searchInput').value.toLowerCase();
         const cards = document.querySelectorAll('.user-card');
@@ -86,6 +88,36 @@
             const username = card.dataset.username;
             card.style.display = username.includes(query) ? '' : 'none';
         });
+    }
+
+    // Listen for global status updates from base.html
+    window.addEventListener('user_status_change', function (e) {
+        const { userId, isOnline } = e.detail;
+        updateUserStatus(userId, isOnline);
+    });
+
+    function updateUserStatus(userId, isOnline) {
+        // Find user card
+        const userCard = document.querySelector(`.user-card[data-userid="${userId}"]`);
+        if (userCard) {
+            const badge = userCard.querySelector('.status-badge');
+            const dot = badge.querySelector('.status-dot');
+
+            if (isOnline) {
+                userCard.querySelector('.status-badge').className = 'status-badge online';
+                userCard.querySelector('.status-dot').className = 'status-dot online';
+                // Update text node specifically
+                Array.from(badge.childNodes).forEach(node => {
+                    if (node.nodeType === Node.TEXT_NODE) node.textContent = ' Online';
+                });
+            } else {
+                userCard.querySelector('.status-badge').className = 'status-badge offline';
+                userCard.querySelector('.status-dot').className = 'status-dot offline';
+                Array.from(badge.childNodes).forEach(node => {
+                    if (node.nodeType === Node.TEXT_NODE) node.textContent = ' Offline';
+                });
+            }
+        }
     }
 </script>
 {% endblock %}
