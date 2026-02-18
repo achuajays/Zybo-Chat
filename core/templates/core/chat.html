@@ -129,6 +129,25 @@
         wsProtocol + window.location.host + '/ws/chat/' + otherUserId + '/'
     );
 
+    // Listen for global status updates
+    window.addEventListener('user_status_change', function (e) {
+        const { userId, isOnline } = e.detail;
+        if (userId === otherUserId) {
+            updateChatHeaderStatus(isOnline);
+        }
+    });
+
+    function updateChatHeaderStatus(isOnline) {
+        const statusDiv = document.getElementById('userStatus');
+        if (isOnline) {
+            statusDiv.className = 'chat-header-status online';
+            statusDiv.textContent = 'Online';
+        } else {
+            statusDiv.className = 'chat-header-status offline';
+            statusDiv.textContent = 'Offline';
+        }
+    }
+
     chatSocket.onmessage = function (e) {
         const data = JSON.parse(e.data);
 
