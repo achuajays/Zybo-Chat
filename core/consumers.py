@@ -108,3 +108,49 @@ class ChatConsumer(AsyncWebsocketConsumer):
             is_online=is_online,
             last_seen=timezone.now(),
         )
+
+
+class OnlineStatusConsumer(AsyncWebsocketConsumer):
+    """WebSocket consumer for broadcasting online status."""
+
+    async def connect(self):
+        self.user = self.scope['user']
+        if not self.user.is_authenticated:
+            await self.close()
+            return
+
+        self.group_name = 'online_status'
+        await self.channel_layer.group_add(self.group_name, self.channel_name)
+        await self.accept()
+
+        # Broadcast that this user is online
+        await self.channel_layer.group_send(
+            self.group_name,
+            {
+                'type': 'user_status',
+                'user_id': self.user.id,
+                'is_online': True,
+            }
+        )
+
+    async def disconnect(self, close_code):
+        if hasattr(self, 'group_name'):
+            await self.channel_layer.group_discard(self.group_name, self.channel_name)
+
+            # Broadcast that this user is offline
+            await self.channel_layer.group_send(
+                self.group_name,
+                {
+                    'type': 'user_status',
+                    'user_id': self.user.id,
+                    'is_online': False,
+                }
+            )
+
+    async def user_status(self, event):
+        """Handle user_status events."""
+        await self.send(text_data=json.dumps({
+            'type': 'user_status',
+            'user_id': event['user_id'],
+            'is_online': event['is_online'],
+        }))
