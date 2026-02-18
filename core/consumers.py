@@ -11,6 +11,10 @@ class ChatConsumer(AsyncWebsocketConsumer):
         self.user = self.scope['user']
         self.other_user_id = self.scope['url_route']['kwargs']['user_id']
 
+        if not self.user.is_authenticated:
+            await self.close()
+            return
+
         # Create a consistent room name (smaller id first)
         user_ids = sorted([self.user.id, int(self.other_user_id)])
         self.room_name = f'chat_{user_ids[0]}_{user_ids[1]}'
@@ -24,22 +28,22 @@ class ChatConsumer(AsyncWebsocketConsumer):
         await self.accept()
 
     async def disconnect(self, close_code):
-        # Leave room group
-        await self.channel_layer.group_discard(self.room_name, self.channel_name)
+        if hasattr(self, 'room_name'):
+            # Leave room group
+            await self.channel_layer.group_discard(self.room_name, self.channel_name)
 
         # Mark user as offline
         await self.set_online_status(False)
 
     async def receive(self, text_data):
         data = json.loads(text_data)
-        message_content = data.get('message', '')
         msg_type = data.get('type', 'chat_message')
 
-        if msg_type == 'chat_message' and message_content.strip():
-            # Save message to database
+        if msg_type == 'chat_message':
+            message_content = data.get('message', '').strip()
+            if not message_content:
+                return
             message = await self.save_message(message_content)
-
-            # Send message to room group
             await self.channel_layer.group_send(
                 self.room_name,
                 {
@@ -53,9 +57,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
             )
 
         elif msg_type == 'mark_read':
-            # Mark messages as read
             await self.mark_messages_read()
-            # Notify sender that messages were read
             await self.channel_layer.group_send(
                 self.room_name,
                 {
@@ -64,8 +66,34 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 }
             )
 
+        elif msg_type == 'typing':
+            # Broadcast typing status to the other user
+            await self.channel_layer.group_send(
+                self.room_name,
+                {
+                    'type': 'typing_indicator',
+                    'sender_id': self.user.id,
+                    'is_typing': data.get('is_typing', False),
+                }
+            )
+
+        elif msg_type == 'delete_message':
+            message_id = data.get('message_id')
+            if message_id:
+                deleted = await self.delete_message(message_id)
+                if deleted:
+                    await self.channel_layer.group_send(
+                        self.room_name,
+                        {
+                            'type': 'message_deleted',
+                            'message_id': message_id,
+                            'deleted_by': self.user.id,
+                        }
+                    )
+
+    # ── Group event handlers ──────────────────────────────────────────────
+
     async def chat_message(self, event):
-        """Handle chat_message events from the group."""
         await self.send(text_data=json.dumps({
             'type': 'chat_message',
             'message': event['message'],
@@ -76,11 +104,26 @@ class ChatConsumer(AsyncWebsocketConsumer):
         }))
 
     async def messages_read(self, event):
-        """Handle messages_read events from the group."""
         await self.send(text_data=json.dumps({
             'type': 'messages_read',
             'reader_id': event['reader_id'],
         }))
+
+    async def typing_indicator(self, event):
+        await self.send(text_data=json.dumps({
+            'type': 'typing_indicator',
+            'sender_id': event['sender_id'],
+            'is_typing': event['is_typing'],
+        }))
+
+    async def message_deleted(self, event):
+        await self.send(text_data=json.dumps({
+            'type': 'message_deleted',
+            'message_id': event['message_id'],
+            'deleted_by': event['deleted_by'],
+        }))
+
+    # ── DB helpers ────────────────────────────────────────────────────────
 
     @database_sync_to_async
     def save_message(self, content):
@@ -100,6 +143,16 @@ class ChatConsumer(AsyncWebsocketConsumer):
             receiver=self.user,
             is_read=False,
         ).update(is_read=True)
+
+    @database_sync_to_async
+    def delete_message(self, message_id):
+        """Delete a message only if the current user is the sender."""
+        from .models import Message
+        deleted_count, _ = Message.objects.filter(
+            id=message_id,
+            sender=self.user,
+        ).delete()
+        return deleted_count > 0
 
     @database_sync_to_async
     def set_online_status(self, is_online):
@@ -148,7 +201,6 @@ class OnlineStatusConsumer(AsyncWebsocketConsumer):
             )
 
     async def user_status(self, event):
-        """Handle user_status events."""
         await self.send(text_data=json.dumps({
             'type': 'user_status',
             'user_id': event['user_id'],
