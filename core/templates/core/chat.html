@@ -57,8 +57,10 @@
         <!-- Chat Header -->
         <div class="chat-header">
             <div class="chat-header-left">
-                <a href="{% url 'user_list' %}" style="display:flex; align-items:center; margin-right: 4px;">
-                    <i class="lucide-arrow-left" style="font-size: 18px; color: var(--text-muted);"></i>
+                <a href="{% url 'user_list' %}"
+                    style="display:flex; align-items:center; margin-right: 12px; text-decoration: none; color: var(--text-secondary);">
+                    <i class="lucide-arrow-left" style="font-size: 20px;"></i>
+                    <span style="margin-left: 4px; font-weight: 500; font-size: 14px;">Back</span>
                 </a>
                 <div class="chat-header-avatar" style="background: #7C9070;">
                     {{ other_user.username|initials }}
